@@ -18,8 +18,8 @@
 
 package org.wso2.carbon.uuf.core;
 
-import org.wso2.carbon.uuf.api.Configuration;
 import org.wso2.carbon.uuf.api.auth.Session;
+import org.wso2.carbon.uuf.api.config.Configuration;
 import org.wso2.carbon.uuf.api.model.MapModel;
 import org.wso2.carbon.uuf.exception.FragmentNotFoundException;
 import org.wso2.carbon.uuf.exception.HttpErrorException;
@@ -118,7 +118,8 @@ public class App {
             return renderPageUri(request.getUriWithoutContextPath(), null, requestLookup, api, theme);
         } catch (SessionNotFoundException e) {
             String loginPageUri = configuration.getLoginPageUri().orElseThrow(() -> e);
-            throw new PageRedirectException(loginPageUri, e); // Redirect to the login page.
+            // Redirect to the login page.
+            throw new PageRedirectException(requestLookup.getContextPath() + loginPageUri, e);
         } catch (PageRedirectException e) {
             throw e;
         } catch (PageNotFoundException e) {
