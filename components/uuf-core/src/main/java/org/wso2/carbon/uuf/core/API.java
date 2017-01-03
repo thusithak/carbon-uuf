@@ -21,20 +21,20 @@ package org.wso2.carbon.uuf.core;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.wso2.carbon.uuf.api.auth.Session;
-import org.wso2.carbon.uuf.spi.auth.User;
 import org.wso2.carbon.uuf.exception.HttpErrorException;
 import org.wso2.carbon.uuf.exception.PageRedirectException;
 import org.wso2.carbon.uuf.exception.UUFException;
-import org.wso2.carbon.uuf.internal.core.auth.SessionRegistry;
+import org.wso2.carbon.uuf.internal.auth.SessionRegistry;
+import org.wso2.carbon.uuf.spi.auth.User;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import javax.naming.Binding;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 
 // TODO remove this SuppressWarnings
 @SuppressWarnings("PackageAccessibility")
@@ -65,7 +65,7 @@ public class API {
      * @param serviceClassName  service class name
      * @param serviceMethodName method name
      * @param args              method arguments
-     * @return
+     * @return invoked OSGi service instance
      */
     public static Object callOSGiService(String serviceClassName, String serviceMethodName, Object... args) {
         Object serviceInstance;
@@ -147,7 +147,7 @@ public class API {
     /**
      * Creates a new session and returns it.
      *
-     * @param userName user name
+     * @param user user to create the session
      * @return newly created session
      */
     public Session createSession(User user) {

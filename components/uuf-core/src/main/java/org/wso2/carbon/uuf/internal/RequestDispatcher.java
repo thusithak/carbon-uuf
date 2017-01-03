@@ -30,14 +30,19 @@ import org.wso2.carbon.uuf.spi.HttpRequest;
 import org.wso2.carbon.uuf.spi.HttpResponse;
 
 import static org.wso2.carbon.uuf.spi.HttpResponse.CONTENT_TYPE_TEXT_HTML;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_CACHE_CONTROL;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_EXPIRES;
 import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_LOCATION;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_PRAGMA;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_X_CONTENT_TYPE_OPTIONS;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_X_XSS_PROTECTION;
 import static org.wso2.carbon.uuf.spi.HttpResponse.STATUS_FOUND;
 import static org.wso2.carbon.uuf.spi.HttpResponse.STATUS_INTERNAL_SERVER_ERROR;
 import static org.wso2.carbon.uuf.spi.HttpResponse.STATUS_OK;
 
 public class RequestDispatcher {
 
-    private static final Logger log = LoggerFactory.getLogger(RequestDispatcher.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(RequestDispatcher.class);
 
     private final StaticResolver staticResolver;
     private final Debugger debugger;
@@ -52,9 +57,6 @@ public class RequestDispatcher {
     }
 
     public void serve(App app, HttpRequest request, HttpResponse response) {
-        if (log.isDebugEnabled() && !request.isDebugRequest()) {
-            log.debug("HTTP request received " + request);
-        }
 
         try {
             if (request.isStaticResourceRequest()) {
@@ -71,11 +73,11 @@ public class RequestDispatcher {
             serveDefaultErrorPage(e.getHttpStatusCode(), e.getMessage(), response);
         } catch (UUFException e) {
             String msg = "A server error occurred while serving for request '" + request + "'.";
-            log.error(msg, e);
+            LOGGER.error(msg, e);
             serveDefaultErrorPage(STATUS_INTERNAL_SERVER_ERROR, msg, response);
         } catch (Exception e) {
             String msg = "An unexpected error occurred while serving for request '" + request + "'.";
-            log.error(msg, e);
+            LOGGER.error(msg, e);
             serveDefaultErrorPage(STATUS_INTERNAL_SERVER_ERROR, msg, response);
         }
     }
@@ -83,6 +85,8 @@ public class RequestDispatcher {
     private void servePageOrFragment(App app, HttpRequest request, HttpResponse response) {
         try {
             String html;
+            // set default mandatory http headers for security purpose
+            setDefaultSecurityHeaders(response);
             if (request.isFragmentRequest()) {
                 html = app.renderFragment(request, response);
             } else {
@@ -112,5 +116,18 @@ public class RequestDispatcher {
 
     public void serveDefaultFavicon(HttpRequest request, HttpResponse response) {
         staticResolver.serveDefaultFavicon(request, response);
+    }
+
+    /**
+     * Sets some default and mandatory security related headers to the response path.
+     *
+     * @param httpResponse the http response instance used with setting the headers.
+     */
+    private void setDefaultSecurityHeaders(HttpResponse httpResponse) {
+        httpResponse.setHeader(HEADER_X_CONTENT_TYPE_OPTIONS, "nosniff");
+        httpResponse.setHeader(HEADER_X_XSS_PROTECTION, "1; mode=block");
+        httpResponse.setHeader(HEADER_CACHE_CONTROL, "no-store, no-cache, must-revalidate, private");
+        httpResponse.setHeader(HEADER_EXPIRES, "0");
+        httpResponse.setHeader(HEADER_PRAGMA, "no-cache");
     }
 }

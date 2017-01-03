@@ -53,6 +53,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.wso2.carbon.uuf.api.reference.ComponentReference.DIR_NAME_FRAGMENTS;
 import static org.wso2.carbon.uuf.spi.HttpResponse.CONTENT_TYPE_IMAGE_PNG;
 import static org.wso2.carbon.uuf.spi.HttpResponse.CONTENT_TYPE_WILDCARD;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_CACHE_CONTROL;
+import static org.wso2.carbon.uuf.spi.HttpResponse.HEADER_LAST_MODIFIED;
 import static org.wso2.carbon.uuf.spi.HttpResponse.STATUS_BAD_REQUEST;
 import static org.wso2.carbon.uuf.spi.HttpResponse.STATUS_INTERNAL_SERVER_ERROR;
 import static org.wso2.carbon.uuf.spi.HttpResponse.STATUS_NOT_FOUND;
@@ -65,7 +67,7 @@ public class StaticResolver {
     public static final String DIR_NAME_PUBLIC_RESOURCES = "public";
     private static final DateTimeFormatter HTTP_DATE_FORMATTER;
     private static final ZoneId GMT_TIME_ZONE;
-    private static final Logger log = LoggerFactory.getLogger(StaticResolver.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(StaticResolver.class);
 
     private final Map<Path, ZonedDateTime> resourcesLastModifiedDates;
 
@@ -104,7 +106,7 @@ public class StaticResolver {
     public void serveDefaultFavicon(HttpRequest request, HttpResponse response) {
         InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("/favicon.png");
         if (inputStream == null) {
-            log.error("Cannot find default favicon 'favicon.png' in classpath.");
+            LOGGER.error("Cannot find default favicon 'favicon.png' in classpath.");
             response.setStatus(STATUS_NOT_FOUND);
         } else {
             response.setStatus(STATUS_OK);
@@ -138,7 +140,7 @@ public class StaticResolver {
             return;
         } catch (Exception e) {
             // FileOperationException, IOException or any other Exception that might occur.
-            log.error("An error occurred when manipulating paths for request '" + request + "'.", e);
+            LOGGER.error("An error occurred when manipulating paths for static resource request '{}'.", request, e);
             response.setContent(STATUS_INTERNAL_SERVER_ERROR,
                                 "A server occurred while serving for static resource request '" + request + "'.");
             return;
@@ -289,14 +291,14 @@ public class StaticResolver {
         try {
             return ZonedDateTime.parse(ifModifiedSinceHeader, HTTP_DATE_FORMATTER);
         } catch (DateTimeParseException e) {
-            log.error("Cannot parse 'If-Modified-Since' HTTP header value '" + ifModifiedSinceHeader + "'.", e);
+            LOGGER.warn("Cannot parse 'If-Modified-Since' HTTP header value '{}'.", ifModifiedSinceHeader, e);
             return null;
         }
     }
 
     private void setCacheHeaders(ZonedDateTime lastModifiedDate, HttpResponse response) {
-        response.setHeader("Last-Modified", HTTP_DATE_FORMATTER.format(lastModifiedDate));
-        response.setHeader("Cache-Control", "public,max-age=2592000");
+        response.setHeader(HEADER_LAST_MODIFIED, HTTP_DATE_FORMATTER.format(lastModifiedDate));
+        response.setHeader(HEADER_CACHE_CONTROL, "public,max-age=2592000");
     }
 
     private String getContentType(HttpRequest request, Path resource) {

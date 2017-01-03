@@ -1,27 +1,29 @@
 /*
- *  Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
- *  WSO2 Inc. licenses this file to you under the Apache License,
- *  Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License.
- *  You may obtain a copy of the License at
+ * WSO2 Inc. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing,
- *  software distributed under the License is distributed on an
- *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- *  KIND, either express or implied.  See the License for the
- *  specific language governing permissions and limitations
- *  under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
-package org.wso2.carbon.uuf.internal.core.deployment;
+package org.wso2.carbon.uuf.internal.deployment;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.SetMultimap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.wso2.carbon.uuf.api.Placeholder;
 import org.wso2.carbon.uuf.api.config.ComponentManifest;
 import org.wso2.carbon.uuf.api.config.Configuration;
@@ -44,17 +46,19 @@ import org.wso2.carbon.uuf.core.UriPatten;
 import org.wso2.carbon.uuf.exception.InvalidTypeException;
 import org.wso2.carbon.uuf.exception.MalformedConfigurationException;
 import org.wso2.carbon.uuf.exception.UUFException;
-import org.wso2.carbon.uuf.internal.core.auth.SessionRegistry;
-import org.wso2.carbon.uuf.internal.core.deployment.parser.ComponentManifestParser;
-import org.wso2.carbon.uuf.internal.core.deployment.parser.ConfigurationParser;
-import org.wso2.carbon.uuf.internal.core.deployment.parser.DependencyTreeParser;
+import org.wso2.carbon.uuf.internal.auth.SessionRegistry;
+import org.wso2.carbon.uuf.internal.deployment.parser.ComponentManifestParser;
+import org.wso2.carbon.uuf.internal.deployment.parser.ConfigurationParser;
+import org.wso2.carbon.uuf.internal.deployment.parser.DependencyTreeParser;
 import org.wso2.carbon.uuf.internal.util.NameUtils;
 import org.wso2.carbon.uuf.spi.RenderableCreator;
 import org.yaml.snakeyaml.Yaml;
 
 import java.util.ArrayList;
+import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +71,7 @@ import static org.wso2.carbon.uuf.internal.util.NameUtils.getFullyQualifiedName;
 
 public class AppCreator {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(AppCreator.class);
     private final Map<String, RenderableCreator> renderableCreators;
     private final Set<String> supportedExtensions;
     private final ClassLoaderProvider classLoaderProvider;
@@ -105,8 +110,8 @@ public class AppCreator {
             ComponentReference componentReference = appReference.getComponentReference(componentContextPath);
             ClassLoader classLoader = classLoaderProvider.getClassLoader(componentName, componentVersion,
                                                                          componentReference);
-            Component component = createComponent(componentName, componentVersion, componentContextPath,
-                                                  componentReference, classLoader, lookup);
+            Component component = createComponent(contextPath, componentName, componentVersion, componentContextPath,
+                    componentReference, classLoader, lookup);
             lookup.add(component);
             createdComponents.put(componentName, component);
         });
@@ -128,9 +133,9 @@ public class AppCreator {
         return flattenedDependencies;
     }
 
-    private Component createComponent(String componentName, String componentVersion, String componentContextPath,
-                                      ComponentReference componentReference, ClassLoader classLoader,
-                                      Lookup lookup) {
+    private Component createComponent(String appContextPath, String componentName, String componentVersion,
+                                      String componentContextPath, ComponentReference componentReference,
+                                      ClassLoader classLoader, Lookup lookup) {
         componentReference.getLayouts(supportedExtensions)
                 .map(layoutReference -> createLayout(layoutReference, componentName))
                 .forEach(lookup::add);
@@ -141,7 +146,7 @@ public class AppCreator {
         componentReference.getManifest().ifPresent(componentManifestFile -> {
             ComponentManifest componentManifest = ComponentManifestParser.parse(componentManifestFile);
             addBindings(componentManifest.getBindings(), lookup, componentName);
-            // TODO: Register APIs
+            addAPIs(componentManifest.getApis(), appContextPath, componentContextPath, componentName, classLoader);
         });
 
         if (!componentReference.getI18nFiles().isEmpty()) {
@@ -189,6 +194,30 @@ public class AppCreator {
                 }
             }
             lookup.addBinding(zoneName, fragments, binding.getMode());
+        }
+    }
+
+    private void addAPIs(List<ComponentManifest.API> apis, String appContextPath, String componentContextPath,
+                         String componentName, ClassLoader classLoader) {
+        if ((apis == null) || apis.isEmpty()) {
+            return;
+        }
+
+        for (ComponentManifest.API api : apis) {
+            String className = api.getClassName();
+            String uri = appContextPath + componentContextPath + "/apis" + api.getUri();
+            Object apiImplementation;
+            try {
+                apiImplementation = classLoader.loadClass(className).newInstance();
+            } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+                throw new UUFException("Cannot deploy REST API '" + className + "' for component '" +
+                        componentName + "'", e);
+            }
+            Dictionary<String, String> serviceProperties = new Hashtable<>();
+            serviceProperties.put("contextPath", uri);
+            classLoaderProvider.deployAPI(apiImplementation, serviceProperties);
+            LOGGER.info("Deployed REST API '{}' for component '{}' with context path '{}'.",
+                    className, componentName, uri);
         }
     }
 
