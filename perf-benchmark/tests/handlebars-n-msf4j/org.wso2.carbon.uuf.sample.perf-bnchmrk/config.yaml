@@ -1,5 +1,5 @@
 appName : Performance Benchmark App
-theme : org.wso2.carbon.uuf.sample.theme.default
+theme : org.wso2.carbon.uuf.common.theme.default.theme
 menu :
   main :
     Home : {link: "", icon: "fw-home"}

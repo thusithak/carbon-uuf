@@ -16,5 +16,5 @@
 
 //noinspection JSUnusedGlobalSymbols
 function onRequest(env) {
-    setAppTheme("org.wso2.carbon.uuf.sample.theme.blue");
+    setAppTheme("org.wso2.carbon.uuf.sample.blue.theme");
 }
